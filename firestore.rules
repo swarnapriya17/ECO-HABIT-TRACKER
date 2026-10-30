@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // User profile document
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+                    && request.resource.data.email is string
+                    && request.resource.data.displayName is string;
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+
+      // Habits subcollection
+      match /habits/{habitId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+                              && request.resource.data.title is string
+                              && request.resource.data.title.size() > 0
+                              && request.resource.data.points is int
+                              && request.resource.data.points >= 0;
+      }
+
+      // Check-ins (Daily habit completions) subcollection
+      match /checkIns/{checkInId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+                              && request.resource.data.habitId is string
+                              && request.resource.data.date is string
+                              && request.resource.data.points is int;
+      }
+
+      // Activities log subcollection
+      match /activities/{activityId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+                              && request.resource.data.title is string;
+      }
+    }
+  }
+}
